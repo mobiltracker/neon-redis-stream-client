@@ -1,17 +1,22 @@
 "use strict";
 
-const { connect } = require("./index.node");
-
-// Creates a gzip compression transform stream, implemented asynchronously in Rust
-function connect() {
-    return connect();
-}
-
+const { connect, hello } = require("./index.node");
 
 function main() {
-    const client = connect();
+  try {
+    console.log(hello());
+
+    const client = connect(
+      "redis://127.0.0.1",
+      "test-stream",
+      "test-group",
+      "test-consumer"
+    );
+    console.log(client);
+  } catch (err) {
+    console.log(err);
+  }
 }
 
-
-main()
+main();
 //module.exports = compress;
