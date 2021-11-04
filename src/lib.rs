@@ -2,7 +2,8 @@ use std::{error::Error, fmt::Formatter, sync::Mutex};
 
 use neon::prelude::*;
 use once_cell::sync::OnceCell;
-use redis_stream_client::sync::RedisStreamClient;
+use redis::FromRedisValue;
+use redis_stream_client::{sync::RedisStreamClient, sync::RedisStreamMessage};
 
 pub struct RedisStreamWrapper(&'static Mutex<RedisStreamClient>);
 
@@ -78,9 +79,66 @@ fn connect(mut cx: FunctionContext) -> JsResult<JsBox<RedisStreamWrapper>> {
     Ok(cx.boxed(wrapper))
 }
 
+fn read_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    let promise = cx
+        .task(
+            move || -> Result<Option<RedisStreamMessage>, StreamClientError> {
+                let stream_client = REDIS_STREAM_CLIENT.get().ok_or_else(|| {
+                    StreamClientError(
+            "Stream client disconnected. You might have forgotten to call connect() at some point"
+                .to_string(),
+        )
+                })?;
+
+                let mut stream_client = stream_client
+                    .lock()
+                    .map_err(|_| StreamClientError("Poisoned Mutex".to_owned()))?;
+
+                stream_client
+                    .read_next()
+                    .map_err(|err| StreamClientError::from(err))
+            },
+        )
+        .promise(resolve_get_next);
+
+    Ok(promise)
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("connect", connect)?;
+    cx.export_function("readNext", read_next)?;
     cx.export_function("hello", hello)?;
     Ok(())
+}
+
+fn resolve_get_next<'a>(
+    cx: &mut TaskContext<'a>,
+    // Return value from `cx.task(..)` closure
+    result: Result<Option<RedisStreamMessage>, StreamClientError>,
+) -> JsResult<'a, JsObject> {
+    let output = result
+        // An error may have occurred while compressing; conditionally grab the
+        // written data
+        .and_then(|msg| {
+            if let Some(msg) = msg {
+                let msg_object = JsObject::new(cx);
+
+                for (key, val) in msg.inner_map {
+                    let key = JsString::new(cx, key);
+                    let val = JsString::new(cx, String::from_redis_value(&val).unwrap());
+                    msg_object
+                        .set(cx, key, val)
+                        .map_err(|_| StreamClientError("Error convering to obj".to_string()))?;
+                }
+
+                Ok(msg_object)
+            } else {
+                Ok(JsObject::new(cx))
+            }
+        })
+        // Convert a Rust error to a JavaScript exception
+        .or_else(|err| cx.throw_error(err.to_string()))?;
+
+    Ok(output)
 }

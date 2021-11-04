@@ -12,9 +12,10 @@ crate-type = ["cdylib"]
 
 [dependencies]
 redis-stream-client = {git = "https://github.com/mobiltracker/rs-redis-stream-client"}
-redis = "0.21.3"
+redis = {version = "0.21.3"}
 once_cell = "*"
-
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
 [dependencies.neon]
 version = "0.10.0-alpha.2"
 default-features = false
