@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
-use neon::{prelude::*, result::JsResultExt, result::Throw};
-use once_cell::sync::{Lazy, OnceCell};
+use neon::prelude::*;
+use once_cell::sync::OnceCell;
 use redis_stream_client::sync::RedisStreamClient;
 
 pub struct RedisStreamWrapper(&'static Mutex<RedisStreamClient>);
