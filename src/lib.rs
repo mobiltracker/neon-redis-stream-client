@@ -102,31 +102,37 @@ fn read_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-// fn ack_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
-//     // This is some funky syntax, but it's taking the first argument to the function,
-//     // attempting to downcast it as a `JsBox<StreamClient>`.
-//     let client_wrapper = &**cx.argument::<JsBox<RedisStreamWrapper>>(0)?;
+fn ack_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    // This is some funky syntax, but it's taking the first argument to the function,
+    // attempting to downcast it as a `JsBox<StreamClient>`.
+    let client_wrapper = &**cx.argument::<JsBox<RedisStreamWrapper>>(0)?;
+    let msg_id = cx.argument::<JsString>(1)?.value(&mut cx);
 
-//     let stream_client = client_wrapper.redis_stream_client.clone();
-//     let promise = cx
-//         .task(
-//             move || -> Result<Option<RedisStreamMessage>, StreamClientError> {
-//                 let mut client = stream_client
-//                     .lock()
-//                     .map_err(|_| StreamClientError("Poisoned Mutex".to_owned()))?;
+    let stream_client = client_wrapper.redis_stream_client.clone();
+    let promise = cx
+        .task(move || -> Result<(), StreamClientError> {
+            let client = stream_client
+                .lock()
+                .map_err(|_| StreamClientError("Poisoned Mutex".to_owned()))?;
 
-//               client.a
-//             },
-//         )
-//         .promise(resolve_get_next);
+            Ok(client
+                .ack_message_id(&msg_id)
+                .map_err(|err| StreamClientError::from(err))?)
+        })
+        .promise(|cx, unit| {
+            Ok(unit
+                .and_then(|_| Ok(JsNull::new(cx)))
+                .or_else(|err| cx.throw_error(err.to_string()))?)
+        });
 
-//     Ok(promise)
-// }
+    Ok(promise)
+}
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("connect", connect)?;
     cx.export_function("readNext", read_next)?;
+    cx.export_function("ackMessage", ack_message)?;
     cx.export_function("hello", hello)?;
     Ok(())
 }
@@ -142,6 +148,12 @@ fn resolve_get_next<'a>(
         .and_then(|msg| {
             if let Some(msg) = msg {
                 let msg_object = JsObject::new(cx);
+                let msg_key_value = JsString::new(cx, msg.key);
+                let msg_key_id = JsString::new(cx, "key");
+
+                msg_object
+                    .set(cx, msg_key_id, msg_key_value)
+                    .map_err(|_| StreamClientError("Error convering to obj".to_string()))?;
 
                 for (key, val) in msg.inner_map {
                     let key = JsString::new(cx, key);

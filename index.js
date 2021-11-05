@@ -1,6 +1,6 @@
 "use strict";
 
-const { connect, hello, readNext } = require("./index.node");
+const { connect, hello, readNext, ackMessage } = require("./index.node");
 
 function main() {
   try {
@@ -17,12 +17,14 @@ function main() {
     readNext(client)
       .then((msg) => {
         console.log(msg);
+        ackMessage(client,msg.key).then(s => console.log("ok"));
       })
       .catch((err) => console.log(err));
+
   } catch (err) {
     console.log(err);
   }
 }
 
 main();
-//module.exports = compress;
+module.exports = {connect, readNext, ackMessage};
