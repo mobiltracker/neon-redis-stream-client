@@ -1,16 +1,19 @@
-use std::{error::Error, fmt::Formatter, sync::Mutex};
+use std::{
+    error::Error,
+    fmt::Formatter,
+    sync::{Arc, Mutex},
+};
 
 use neon::prelude::*;
-use once_cell::sync::OnceCell;
-use redis::FromRedisValue;
+use redis::{Client, FromRedisValue};
 use redis_stream_client::{sync::RedisStreamClient, sync::RedisStreamMessage};
 
-pub struct RedisStreamWrapper(&'static Mutex<RedisStreamClient>);
+pub struct RedisStreamWrapper {
+    redis_stream_client: Arc<Mutex<RedisStreamClient>>,
+    _redis_client: Mutex<Client>,
+}
 
 impl Finalize for RedisStreamWrapper {}
-
-static REDIS_CLIENT: OnceCell<redis::Client> = OnceCell::new();
-static REDIS_STREAM_CLIENT: OnceCell<Mutex<RedisStreamClient>> = OnceCell::new();
 
 #[derive(Debug)]
 // All errors will be converted to JavaScript exceptions with the `Display`
@@ -46,11 +49,7 @@ fn connect(mut cx: FunctionContext) -> JsResult<JsBox<RedisStreamWrapper>> {
         // Convert a Rust error to a JavaScript exception
         .or_else(|err| cx.throw_error(err.to_string()))?;
 
-    REDIS_CLIENT.get_or_init(|| redis_client);
-
-    let redis_connection = REDIS_CLIENT
-        .get()
-        .unwrap()
+    let redis_connection = redis_client
         .get_connection()
         .map_err(|err| StreamClientError::from(err))
         .or_else(|err| cx.throw_error(err.to_string()))?;
@@ -73,28 +72,27 @@ fn connect(mut cx: FunctionContext) -> JsResult<JsBox<RedisStreamWrapper>> {
     })
     .or_else(|err| cx.throw_error(err.to_string()))?;
 
-    REDIS_STREAM_CLIENT.get_or_init(|| Mutex::new(redis_stream_client));
-
-    let wrapper = RedisStreamWrapper(REDIS_STREAM_CLIENT.get().unwrap());
+    let wrapper = RedisStreamWrapper {
+        _redis_client: redis_client.into(),
+        redis_stream_client: Arc::new(Mutex::new(redis_stream_client)),
+    };
     Ok(cx.boxed(wrapper))
 }
 
 fn read_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    // This is some funky syntax, but it's taking the first argument to the function,
+    // attempting to downcast it as a `JsBox<StreamClient>`.
+    let client_wrapper = &**cx.argument::<JsBox<RedisStreamWrapper>>(0)?;
+
+    let stream_client = client_wrapper.redis_stream_client.clone();
     let promise = cx
         .task(
             move || -> Result<Option<RedisStreamMessage>, StreamClientError> {
-                let stream_client = REDIS_STREAM_CLIENT.get().ok_or_else(|| {
-                    StreamClientError(
-            "Stream client disconnected. You might have forgotten to call connect() at some point"
-                .to_string(),
-        )
-                })?;
-
-                let mut stream_client = stream_client
+                let mut client = stream_client
                     .lock()
                     .map_err(|_| StreamClientError("Poisoned Mutex".to_owned()))?;
 
-                stream_client
+                client
                     .read_next()
                     .map_err(|err| StreamClientError::from(err))
             },
@@ -103,6 +101,27 @@ fn read_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     Ok(promise)
 }
+
+// fn ack_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
+//     // This is some funky syntax, but it's taking the first argument to the function,
+//     // attempting to downcast it as a `JsBox<StreamClient>`.
+//     let client_wrapper = &**cx.argument::<JsBox<RedisStreamWrapper>>(0)?;
+
+//     let stream_client = client_wrapper.redis_stream_client.clone();
+//     let promise = cx
+//         .task(
+//             move || -> Result<Option<RedisStreamMessage>, StreamClientError> {
+//                 let mut client = stream_client
+//                     .lock()
+//                     .map_err(|_| StreamClientError("Poisoned Mutex".to_owned()))?;
+
+//               client.a
+//             },
+//         )
+//         .promise(resolve_get_next);
+
+//     Ok(promise)
+// }
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {

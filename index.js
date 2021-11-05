@@ -14,7 +14,7 @@ function main() {
       "test-consumer"
     );
 
-    readNext()
+    readNext(client)
       .then((msg) => {
         console.log(msg);
       })
