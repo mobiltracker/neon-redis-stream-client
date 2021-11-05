@@ -34,10 +34,6 @@ impl std::fmt::Display for StreamClientError {
 
 impl Error for StreamClientError {}
 
-fn hello(mut cx: FunctionContext) -> JsResult<JsString> {
-    return Ok(JsString::new(&mut cx, "Hello world"));
-}
-
 fn connect(mut cx: FunctionContext) -> JsResult<JsBox<RedisStreamWrapper>> {
     let connection_string = cx.argument::<JsString>(0)?.value(&mut cx);
     let stream_key = cx.argument::<JsString>(1)?.value(&mut cx);
@@ -133,7 +129,6 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("connect", connect)?;
     cx.export_function("readNext", read_next)?;
     cx.export_function("ackMessage", ack_message)?;
-    cx.export_function("hello", hello)?;
     Ok(())
 }
 
