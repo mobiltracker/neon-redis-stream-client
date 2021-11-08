@@ -1,8 +1,9 @@
 {
   "name": "js-redis-stream-client",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "",
   "main": "streamClient.ts",
+  "type": "module",
   "scripts": {
     "build": "cargo-cp-artifact -nc index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "yarn build --",
@@ -15,5 +16,8 @@
   "dependencies": {
     "cargo-cp-artifact": "^0.1",
     "typescript": "^4.4.4"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.6"
   }
 }
