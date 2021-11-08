@@ -2,7 +2,7 @@
   "name": "js-redis-stream-client",
   "version": "0.2.0",
   "description": "",
-  "main": "index.node",
+  "main": "streamClient.ts",
   "scripts": {
     "build": "cargo-cp-artifact -nc index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "yarn build --",

@@ -2,9 +2,9 @@
 /// @ts-ignore
 import { connect, readNext, ackMessage } from "./index.node";
 
-type Message = { key: string } & Object;
+export type Message = { key: string } & Object;
 
-class RedisStreamClient {
+export class RedisStreamClient {
   private clientRef: any;
   private connectionString: string;
   private groupName: string;
@@ -40,13 +40,11 @@ class RedisStreamClient {
   }
 
   async readNext() {
-    const msg: Object = await readNext(this.clientRef);
+    const msg: Message = await readNext(this.clientRef);
     return msg;
   }
 
-  async ackMessage(msgId: string) {
+  async ackMessageId(msgId: string) {
     return await ackMessage(this.clientRef, msgId);
   }
 }
-
-export default { connect, readNext, ackMessage };
