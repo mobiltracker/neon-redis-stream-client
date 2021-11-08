@@ -1,6 +1,5 @@
 "use strict";
-/// @ts-ignore
-import { connect, readNext, ackMessage } from "./index.node";
+const streamFFI = require("./index.node");
 
 export type Message = { key: string } & Object;
 
@@ -29,7 +28,7 @@ export class RedisStreamClient {
     // "test-stream",
     // "test-group",
     // "test-consumer"
-    const client = connect(
+    const client = streamFFI.connect(
       this.connectionString,
       this.streamKey,
       this.groupName,
@@ -40,11 +39,11 @@ export class RedisStreamClient {
   }
 
   async readNext() {
-    const msg: Message = await readNext(this.clientRef);
+    const msg: Message = await streamFFI.readNext(this.clientRef);
     return msg;
   }
 
   async ackMessageId(msgId: string) {
-    return await ackMessage(this.clientRef, msgId);
+    return await streamFFI.ackMessage(this.clientRef, msgId);
   }
 }
