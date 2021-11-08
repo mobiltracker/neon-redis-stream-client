@@ -1,9 +1,9 @@
 "use strict";
 const streamFFI = require("./index.node");
 
-export type Message = { key: string } & Object;
+type Message = { key: string } & Object;
 
-export class RedisStreamClient {
+class RedisStreamClient {
   private clientRef: any;
   private connectionString: string;
   private groupName: string;
@@ -47,3 +47,5 @@ export class RedisStreamClient {
     return await streamFFI.ackMessage(this.clientRef, msgId);
   }
 }
+
+module.exports = { RedisStreamClient };
