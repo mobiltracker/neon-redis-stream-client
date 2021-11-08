@@ -2,13 +2,14 @@
   "name": "js-redis-stream-client",
   "version": "0.2.3",
   "description": "",
-  "main": "streamClient.ts",
+  "main": "streamClient.js",
+  "types": "streamClient.d.ts",
   "type": "module",
   "scripts": {
     "build": "cargo-cp-artifact -nc index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "yarn build --",
     "build-release": "yarn build -- --release",
-    "install": "yarn build-release",
+    "install": "yarn build-release && yarn tsc --declaration",
     "test": "cargo test"
   },
   "author": "",
